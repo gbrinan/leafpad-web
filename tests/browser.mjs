@@ -28,7 +28,7 @@ assert.equal(await fs.readFile('evidence/browser-note.md', 'utf8'), '<img src=x 
 assert.ok((await fs.readFile('evidence/browser-note-okf.md', 'utf8')).includes('type: Note'));
 const zipPromise = page.waitForEvent('download'); await page.locator('#export-all').click(); const archive = await zipPromise; await archive.saveAs('evidence/browser-backup.zip');
 await page.screenshot({ path: 'evidence/desktop.png', fullPage: true });
-const second = await context.newPage(); await second.goto(BASE); await second.waitForFunction(() => document.getElementById('editor').readOnly); await second.close();
+const second = await context.newPage(); await second.goto(BASE); await second.waitForFunction(() => document.getElementById('editor').readOnly); await second.locator('.note-row').first().click(); assert.ok(await second.locator('#rename').isDisabled()); assert.ok(await second.locator('#save').isDisabled()); await second.close();
 await page.evaluate(async () => { const root = await navigator.storage.getDirectory(); window.showDirectoryPicker = async () => root.getDirectoryHandle('LeafPad-test', { create: true }); });
 await page.locator('#connect-folder').click(); await page.waitForFunction(() => document.getElementById('save-status').textContent.includes('폴더 연결됨'), { timeout: 20000 });
 await page.locator('#editor').fill('folder autosave 😀'); await page.waitForFunction(() => document.getElementById('save-status').textContent.includes('MD + OKF 파일 저장됨'));

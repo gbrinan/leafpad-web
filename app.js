@@ -1,7 +1,7 @@
 import { newNote, filename, importContent, readOptional, saveToDirectory, bundleEntries, okfText, okfName, zip, MAX_BYTES } from './core.js';
 import * as storage from './storage.js';
 const $ = id => document.getElementById(id);
-let state = { notes: [], tabs: [], active: null }, connection = null, savedConnection = null, queue = Promise.resolve(), debounce, dirtyCache = false, busyFolder = false, cacheRevision = 0;
+let state = { notes: [], tabs: [], active: null }, connection = null, savedConnection = null, queue = Promise.resolve(), debounce, dirtyCache = false, busyFolder = false, polling = false, cacheRevision = 0;
 const channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('leafpad-web-writes') : null;
 let anotherTab = false;
 channel?.addEventListener('message', event => { if (event.data === 'writer-check' && ownsLock) channel.postMessage('writer-active'); else if (event.data === 'writer-active' && !ownsLock) disableWriting(); });
@@ -35,7 +35,7 @@ function render() {
   $('empty').hidden = Boolean(note); $('editor').hidden = !note;
   if (note && $('editor').value !== note.text) $('editor').value = note.text;
   for (const id of ['rename', 'save', 'download-md', 'download-okf']) $(id).disabled = !note;
-  rows(); tabs(); counter();
+  rows(); tabs(); counter(); if (anotherTab) disableWriting();
 }
 async function persist() {
   if (anotherTab) return;
@@ -163,15 +163,19 @@ document.addEventListener('keydown', event => {
 window.addEventListener('beforeunload', event => { if (dirtyCache) { event.preventDefault(); event.returnValue = ''; } });
 document.addEventListener('visibilitychange', () => { if (document.hidden && dirtyCache && active()) { clearTimeout(debounce); enqueue(active().id, false); } });
 async function poll() {
-  if (!connection || busyFolder || anotherTab || document.hidden) return;
-  await queue.catch(() => {});
-  for (const note of state.notes.filter(n => n.directoryId === connection.id)) {
-    if (note.pendingDisk) { enqueue(note.id, false); continue; }
-    const baseline = note.diskText, revision = note.updatedAt;
-    try { const disk = await readOptional(connection.handle, note.diskName); if (disk && !note.pendingDisk && note.updatedAt === revision && note.diskText === baseline && disk.text !== baseline) { note.text = disk.text; note.diskText = disk.text; note.updatedAt = disk.modifiedAt; note.pendingDisk = true; if (note.id === state.active) $('editor').value = note.text; enqueue(note.id, false); } }
-    catch (error) { status(`폴더 확인 대기 · ${error.message}`, true); }
-  }
-  counter();
+  if (!connection || busyFolder || polling || anotherTab || document.hidden) return;
+  polling = true; const sourceDirectory = connection;
+  try {
+    await queue.catch(() => {});
+    for (const note of state.notes.filter(n => n.directoryId === sourceDirectory.id)) {
+      if (connection?.id !== sourceDirectory.id) return;
+      if (note.pendingDisk) { enqueue(note.id, false); continue; }
+      const baseline = note.diskText, revision = note.updatedAt;
+      try { const disk = await readOptional(sourceDirectory.handle, note.diskName); if (disk && !note.pendingDisk && note.updatedAt === revision && note.diskText === baseline && disk.text !== baseline) { note.text = disk.text; note.diskText = disk.text; note.updatedAt = disk.modifiedAt; note.pendingDisk = true; if (note.id === state.active) $('editor').value = note.text; enqueue(note.id, false); } }
+      catch (error) { status(`폴더 확인 대기 · ${error.message}`, true); }
+    }
+    counter();
+  } finally { polling = false; }
 }
 setInterval(poll, 10000);
 async function init() {
