@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#286448">
+  <meta name="description" content="가볍게 쓰고, Markdown과 OKF로 보관하는 탭 메모장. 브라우저 자동 저장과 로컬 폴더 연결을 지원합니다.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <title>LeafPad — 생각을 담는 작은 공간</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar" aria-label="메모 목록">
+      <a class="brand" href="./" aria-label="LeafPad 홈"><img src="./icon.svg" alt="" width="30" height="30"><span>leafpad<span class="brand-dot">.</span></span><span class="edition">WEB</span></a>
+      <button id="new-note" class="primary"><span aria-hidden="true">＋</span> 새 메모</button>
+      <label class="search"><span class="sr-only">메모 검색</span><input id="search" type="search" placeholder="제목이나 내용으로 찾기" autocomplete="off"></label>
+      <div class="list-heading"><span>내 메모</span><span id="note-count">0</span></div>
+      <nav id="note-list" class="note-list" aria-label="저장된 메모"></nav>
+      <div class="storage-card"><span class="eyebrow">저장 공간</span><strong id="storage-label">이 브라우저</strong><p id="storage-detail">메모는 이 기기에 자동 저장됩니다.</p><button id="connect-folder" class="quiet">폴더 연결</button><button id="disconnect-folder" class="text-button" hidden>연결 해제</button></div>
+      <button id="help" class="text-button help-button">사용 안내</button>
+    </aside>
+    <main class="workspace">
+      <header class="topbar"><button id="toggle-sidebar" class="icon-button mobile-only" aria-label="메모 목록 열기" aria-expanded="false">☰</button><div><span class="eyebrow">생각을 담는 작은 공간</span><h1 id="document-title">시작하기</h1></div><div class="top-actions"><button id="import" class="quiet">파일 열기</button><button id="export-all" class="quiet">전체 백업</button></div></header>
+      <div id="tabs" class="tabs" role="tablist" aria-label="열린 메모"></div>
+      <div class="toolbar"><div class="toolbar-group"><button id="rename" class="text-button">제목 변경</button><button id="save" class="text-button">저장</button></div><div class="toolbar-group"><button id="download-md" class="format-button">MD 다운로드</button><button id="download-okf" class="format-button">OKF 다운로드</button></div></div>
+      <section class="editor-shell" id="editor-shell" aria-label="메모 편집"><textarea id="editor" aria-label="Markdown 편집기" spellcheck="false" placeholder="생각나는 것을 적어 보세요…"></textarea><div id="empty" class="empty" hidden><img src="./icon.svg" alt="" width="52" height="52"><h2>한 줄에서 시작해도 좋아요.</h2><p>새 메모를 만들거나 기존 Markdown 파일을 열어 보세요.</p><button id="empty-new" class="primary">첫 메모 쓰기</button></div></section>
+      <footer class="statusbar"><span id="save-status" role="status" aria-live="polite">불러오는 중…</span><span id="character-count">UTF-8 · Markdown</span></footer>
+    </main>
+  </div>
+  <input id="file-input" type="file" accept=".md,text/markdown,text/plain" multiple hidden>
+  <dialog id="rename-dialog"><form method="dialog"><h2>메모 제목</h2><p>연결된 파일의 이름은 유지됩니다.</p><label>제목<input id="title-input" maxlength="120" required></label><div class="dialog-actions"><button value="cancel" class="quiet" formnovalidate>취소</button><button value="save" class="primary">변경</button></div></form></dialog>
+  <dialog id="help-dialog"><h2>어디서든 가볍게.</h2><p>메모와 열린 탭은 이 브라우저에 자동 저장됩니다. 브라우저 데이터를 지우거나 다른 기기로 옮기기 전에는 <strong>전체 백업</strong>을 다운로드하세요.</p><h3>Drive와 함께 쓰기</h3><p>PC의 Chrome·Edge에서 <strong>폴더 연결</strong>을 눌러 Google Drive 데스크톱의 LeafPad 폴더를 선택하세요. 메모와 OKF 사본을 그 폴더에 저장하고, Drive 앱이 동기화합니다. 업로드 완료는 Drive 앱에서 확인하세요.</p><p>다른 브라우저·모바일은 브라우저 저장과 다운로드를 지원합니다. 이 버전은 Google 계정에 직접 로그인하는 기능을 제공하지 않습니다.</p><h3>MD와 OKF</h3><p>MD는 편집하는 원본입니다. OKF는 YAML 메타데이터를 덧붙인 Markdown 사본으로, 확장자도 .md입니다. 폴더 연결 시 OKF/notes에 함께 저장합니다. 사본을 직접 수정하면 덮어쓰지 않고 알려드립니다.</p><h3>단축키</h3><p>Ctrl / ⌘ + S 저장 · Ctrl / ⌘ + O 파일 열기 · Alt + N 새 메모</p><p class="muted">공개 사이트에는 앱 코드만 있습니다. 메모 내용은 GitHub 서버로 업로드하지 않습니다.</p><div class="dialog-actions"><button id="close-help" class="primary">알겠어요</button></div></dialog>
+</body>
+</html>

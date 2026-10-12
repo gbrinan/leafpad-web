@@ -1,0 +1,9 @@
+node_modules/
+evidence/
+*.zip
+.DS_Store
+.env
+.env.*
+*.log
+notes/
+OKF/
