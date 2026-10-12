@@ -63,10 +63,12 @@ npm test
 
 ```sh
 npm install --no-save playwright
-BROWSER_CHANNEL=chrome node tests/browser.mjs
+node tests/browser.mjs
 ```
 
 브라우저 테스트는 개인 메모를 사용하지 않고 임시 브라우저 프로필 및 브라우저 내부의 테스트 폴더(OPFS)를 사용합니다. 실제 Drive 연결 상태는 각 PC와 Drive 앱에서 확인해야 합니다. ZIP 검증에는 Python 표준 라이브러리 `zipfile`을 사용했습니다.
+
+[검증 결과](VALIDATION.md)
 
 ## 배포와 개인정보
 
