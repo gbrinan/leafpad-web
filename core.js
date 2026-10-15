@@ -26,12 +26,14 @@ export function linkLine(title, output) {
 export function indexText(lines) {
   return `---\r\nokf_version: "0.2"\r\n---\r\n\r\n<!-- LeafPad generated index -->\r\n# 메모\r\n\r\n${lines.join('\r\n')}\r\n`;
 }
-export async function readOptional(directory, name) {
+export async function readOptional(directory, name, known = null) {
   try {
     const handle = await directory.getFileHandle(name);
     const file = await handle.getFile();
     if (file.size > MAX_BYTES + 16384) throw new Error('8MB 이하의 메모를 사용해 주세요.');
-    return { text: new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer()), modifiedAt: new Date(file.lastModified).toISOString() };
+    const stamp = { diskModifiedAt: file.lastModified, diskSize: file.size };
+    if (known && known.diskModifiedAt === file.lastModified && known.diskSize === file.size) return { unchanged: true, ...stamp };
+    return { ...stamp, text: new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer()), modifiedAt: new Date(file.lastModified).toISOString() };
   } catch (error) { if (error.name === 'NotFoundError') return null; throw error; }
 }
 async function write(directory, name, text) {
@@ -57,7 +59,7 @@ export async function saveToDirectory(note, directory) {
   if (conflict) name = await availableName(directory, `${name.replace(/\.md$/i, '').slice(0, 65)} (충돌).md`);
   if (!old || old.text !== note.text || name !== (note.diskName || note.fileName)) await write(directory, name, note.text);
   const saved = await readOptional(directory, name);
-  const commit = { diskName: name, diskText: note.text, fileName: name, pendingDisk: true, conflict: Boolean(conflict) };
+  const commit = { diskName: name, diskText: note.text, fileName: name, diskModifiedAt: saved.diskModifiedAt, diskSize: saved.diskSize, pendingDisk: true, conflict: Boolean(conflict) };
   try {
     const root = await directory.getDirectoryHandle('OKF', { create: true });
     const notes = await root.getDirectoryHandle('notes', { create: true });

@@ -15,3 +15,12 @@
 - 공개 GitHub Pages 주소에서 HTTP 200, 메모 작성·자동 저장·새로고침 후 복원, OKF 다운로드, JavaScript 오류 0개 확인.
 
 실제 Drive 클라우드 업로드, Safari 실기기, 장시간 사용, 여러 기기의 동시 편집은 이번 웹 검증 범위에 포함하지 않았습니다. Drive 업로드는 각 PC의 Drive 데스크톱 앱이 담당하며, 다른 앱에서 동시에 파일을 편집하는 방식은 피하는 것이 좋습니다.
+
+
+## Loading performance fix (2026-10-16)
+
+- Public HTML returned HTTP 200 in 622 ms in a single local request; this is not an end-to-end browser measurement. The current in-app browser inspection timed out, so its specific bottleneck remains unconfirmed.
+- Folder restoration previously queued every note for dual-save, including unchanged notes, with repeated whole-state IndexedDB writes and list rendering. Polling read every file body every ten seconds.
+- Restoration now saves only pending changes. Last-modified time and byte size allow unchanged file bodies to be skipped during restoration and polling. Actual saves still read the source body for conflict protection. File listing/metadata checks and the first migration scan remain necessary; same-size edits preserving the timestamp are not detected by metadata polling.
+- Preview generation is bounded to 512 characters; redundant pre-IndexedDB structured cloning and background-save list rendering were removed. Service worker cache advanced to v4.
+- Ten core tests passed. Chrome browser scenarios passed: unchanged connected-folder reload produced zero file body reads and zero file writes, autosave, MD/OKF, conflicts, downloads, second-window read-only behavior, mobile layout and offline reload. Firefox was unavailable in the installed test runtime. No personal notes used.

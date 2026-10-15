@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import { filename, newNote, hash, okfName, okfText, bundleEntries, zip, saveToDirectory, importContent } from '../core.js';
+import { filename, newNote, hash, okfName, okfText, bundleEntries, zip, saveToDirectory, importContent, readOptional } from '../core.js';
 class Directory {
   constructor() { this.files = new Map(); this.directories = new Map(); this.failed = new Set(); }
   async getFileHandle(name, options = {}) {
@@ -18,6 +18,20 @@ class Directory {
   }
   async getDirectoryHandle(name, options = {}) { if (!this.directories.has(name)) { if (!options.create) throw Object.assign(new Error('Missing'), { name: 'NotFoundError' }); this.directories.set(name, new Directory()); } return this.directories.get(name); }
 }
+
+test('unchanged files skip body reads; changed size or timestamp forces a read', async () => {
+  let reads = 0, size = 5, modified = 1000;
+  const directory = { async getFileHandle() { return { async getFile() { return { size, lastModified: modified, async arrayBuffer() { reads++; return new TextEncoder().encode('hello').buffer; } }; } }; } };
+  const first = await readOptional(directory, 'test.md');
+  assert.equal(first.text, 'hello');
+  assert.equal((await readOptional(directory, 'test.md', first)).unchanged, true);
+  assert.equal(reads, 1);
+  modified++;
+  assert.equal((await readOptional(directory, 'test.md', first)).text, 'hello');
+  modified--; size++;
+  assert.equal((await readOptional(directory, 'test.md', first)).text, 'hello');
+  assert.equal(reads, 3);
+});
 test('safe filenames keep Korean and handle reserved Windows names', () => { assert.equal(filename('한글/메모'), '한글 메모.md'); assert.equal(filename('CON'), '메모 CON.md'); assert.equal(filename('../hello'), '.. hello.md'); });
 test('reserved OKF names are deterministic and non-reserved', async () => { assert.match(await okfName('index.md'), /^note-index-[A-F0-9]{8}\.md$/); assert.equal(await okfName('메모.md'), '메모.md'); });
 test('MD and OKF contain exactly the same body, with quoted metadata', () => { const n = newNote('한글 "제목"', '# 기록 😀\r\n<script>alert(1)</script>'); assert.ok(okfText(n).endsWith(`---\r\n${n.text}`)); assert.equal(importContent('export.md', okfText(n)).text, n.text); assert.equal(importContent('export.md', okfText(n)).title, n.title); });

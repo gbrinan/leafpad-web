@@ -16,7 +16,7 @@ function rows() {
     if (query && !`${note.title}\n${note.text}`.toLocaleLowerCase().includes(query)) continue;
     const button = document.createElement('button'); button.className = `note-row${note.id === state.active ? ' active' : ''}`;
     const title = document.createElement('strong'); title.textContent = note.title;
-    const preview = document.createElement('small'); preview.textContent = note.text.split(/\r?\n/).find(line => line.trim()) || '아직 비어 있는 메모';
+    const preview = document.createElement('small'); preview.textContent = note.text.slice(0, 512).split(/\r?\n/).find(line => line.trim())?.slice(0, 160) || '아직 비어 있는 메모';
     button.append(title, preview); button.title = note.title; button.onclick = () => openNote(note.id); $('note-list').append(button);
   }
 }
@@ -40,7 +40,7 @@ function render() {
 async function persist() {
   if (anotherTab) return;
   const revision = cacheRevision;
-  await storage.set('state', structuredClone(state)); if (cacheRevision === revision) dirtyCache = false;
+  await storage.set('state', state); if (cacheRevision === revision) dirtyCache = false;
 }
 function enqueue(id, show = true) {
   queue = queue.catch(() => {}).then(async () => {
@@ -58,7 +58,7 @@ function enqueue(id, show = true) {
           await persist(); if (show) status(commit.conflict ? '충돌 사본으로 MD + OKF 저장됨' : 'MD + OKF 파일 저장됨 · Drive에서 업로드 확인');
         } catch (error) { if (error.commit) Object.assign(note, error.commit); await persist(); throw error; }
       }
-      rows();
+      if (show) rows();
     } catch (error) { status(`${error.commit ? 'MD 저장됨 · OKF 저장 대기' : '저장 대기'} · ${error.message}`, true); throw error; }
   });
   queue.catch(() => {}); return queue;
@@ -121,21 +121,22 @@ async function loadDirectory(nextConnection) {
     await storage.set('directory', nextConnection);
     for await (const [name, handle] of connection.handle.entries()) {
       if (handle.kind !== 'file' || !/\.md$/i.test(name)) continue;
-      const content = await readOptional(connection.handle, name); if (!content) continue;
       const note = state.notes.find(n => n.directoryId === connection.id && n.diskName === name);
+      if (note?.pendingDisk) continue;
+      const content = await readOptional(connection.handle, name, note); if (!content || content.unchanged) continue;
       if (note) {
-        if (!note.pendingDisk) { note.text = content.text; note.diskText = content.text; note.updatedAt = content.modifiedAt; }
+        if (!note.pendingDisk) { note.pendingDisk = note.diskText !== content.text; note.text = content.text; note.diskText = content.text; note.updatedAt = content.modifiedAt; note.diskModifiedAt = content.diskModifiedAt; note.diskSize = content.diskSize; }
       } else {
         const imported = newNote(name.slice(0, -3), content.text);
-        Object.assign(imported, { fileName: name, directoryId: connection.id, diskName: name, diskText: content.text, pendingDisk: true, updatedAt: content.modifiedAt });
+        Object.assign(imported, { fileName: name, directoryId: connection.id, diskName: name, diskText: content.text, diskModifiedAt: content.diskModifiedAt, diskSize: content.diskSize, pendingDisk: true, updatedAt: content.modifiedAt });
         state.notes.push(imported);
       }
     }
     for (const note of state.notes) if (!note.directoryId) { note.directoryId = connection.id; note.pendingDisk = true; }
     if (!state.active && state.notes.length) { state.active = state.notes[0].id; state.tabs.push(state.active); }
     await persist(); render();
-    for (const note of state.notes.filter(n => n.directoryId === connection.id)) enqueue(note.id, false);
-    await queue; status('폴더 연결됨 · MD + OKF 파일 저장 완료');
+    for (const note of state.notes.filter(n => n.directoryId === connection.id && n.pendingDisk)) enqueue(note.id, false);
+    await queue; rows(); status('폴더 연결됨 · MD + OKF 파일 저장 완료');
   } finally { busyFolder = false; }
 }
 $('new-note').onclick = create; $('empty-new').onclick = create; $('search').oninput = rows;
@@ -171,7 +172,7 @@ async function poll() {
       if (connection?.id !== sourceDirectory.id) return;
       if (note.pendingDisk) { enqueue(note.id, false); continue; }
       const baseline = note.diskText, revision = note.updatedAt;
-      try { const disk = await readOptional(sourceDirectory.handle, note.diskName); if (disk && !note.pendingDisk && note.updatedAt === revision && note.diskText === baseline && disk.text !== baseline) { note.text = disk.text; note.diskText = disk.text; note.updatedAt = disk.modifiedAt; note.pendingDisk = true; if (note.id === state.active) $('editor').value = note.text; enqueue(note.id, false); } }
+      try { const disk = await readOptional(sourceDirectory.handle, note.diskName, note); if (disk && !disk.unchanged && !note.pendingDisk && note.updatedAt === revision && note.diskText === baseline && disk.text !== baseline) { note.text = disk.text; note.diskText = disk.text; note.updatedAt = disk.modifiedAt; note.diskModifiedAt = disk.diskModifiedAt; note.diskSize = disk.diskSize; note.pendingDisk = true; if (note.id === state.active) $('editor').value = note.text; enqueue(note.id, false); } else if (disk && !disk.unchanged && !note.pendingDisk && note.updatedAt === revision && note.diskText === baseline) { note.diskModifiedAt = disk.diskModifiedAt; note.diskSize = disk.diskSize; } }
       catch (error) { status(`폴더 확인 대기 · ${error.message}`, true); }
     }
     counter();

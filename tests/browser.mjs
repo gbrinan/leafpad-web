@@ -34,6 +34,17 @@ await page.locator('#connect-folder').click(); await page.waitForFunction(() => 
 await page.locator('#editor').fill('folder autosave 😀'); await page.waitForFunction(() => document.getElementById('save-status').textContent.includes('MD + OKF 파일 저장됨'));
 const readFolder = async () => page.evaluate(async () => { const root = await navigator.storage.getDirectory(), dir = await root.getDirectoryHandle('LeafPad-test'); const h = await dir.getFileHandle('second.md'); const okf = await (await (await dir.getDirectoryHandle('OKF')).getDirectoryHandle('notes')).getFileHandle('second.md'); return { md: await (await h.getFile()).text(), okf: await (await okf.getFile()).text() }; });
 const pair = await readFolder(); assert.equal(pair.md, 'folder autosave 😀'); assert.ok(pair.okf.endsWith('---\r\nfolder autosave 😀'));
+await page.addInitScript(() => {
+  window.folderIO = { reads: 0, writes: 0 };
+  const read = File.prototype.arrayBuffer;
+  File.prototype.arrayBuffer = function(...args) { window.folderIO.reads++; return read.apply(this, args); };
+  const write = FileSystemFileHandle.prototype.createWritable;
+  FileSystemFileHandle.prototype.createWritable = function(...args) { window.folderIO.writes++; return write.apply(this, args); };
+});
+await page.reload();
+await page.waitForFunction(() => document.getElementById('save-status').textContent.includes('폴더 연결됨'));
+assert.deepEqual(await page.evaluate(() => window.folderIO), { reads: 0, writes: 0 });
+console.log('Unchanged folder reload: zero body reads and zero file writes');
 await page.locator('#editor').fill('my concurrent text');
 await page.evaluate(async () => { const root = await navigator.storage.getDirectory(), dir = await root.getDirectoryHandle('LeafPad-test'); const w = await (await dir.getFileHandle('second.md')).createWritable(); await w.write('remote edit'); await w.close(); });
 await page.locator('#save').click(); await page.waitForFunction(() => document.getElementById('save-status').textContent.includes('충돌 사본'));
